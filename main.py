@@ -1,5 +1,4 @@
-import datascience
-from datascience import *
+import time
 import spotipy
 from spotipy.oauth2 import SpotifyClientCredentials
 from datetime import datetime
@@ -8,8 +7,9 @@ import json
 from spotify_player import play_song
 import requests
 from auth import auth_dict
-
-spotify = Table.read_table("SpotifyFeatures.csv")
+import pandas as pd
+print("RUN ANALYSIS")
+spotify = pd.read_csv("SpotifyFeatures.csv")
 
 def set_parameters(time_of_day, busyness, std_div):
     params = {}
@@ -110,24 +110,35 @@ while (True):
         current_params = set_parameters(hour, stress_gauge, floors_stdev)
 
         # Filter through spotify table and find the appropriate song to play
-        matching_mode = spotify.where("mode", are.equal_to(current_params["mode"]))
-        matching_tempo = matching_mode.where("tempo", are.between(current_params["tempo"][0], current_params["tempo"][1]))
-        matching_loudness = matching_tempo.where("loudness", are.between(current_params["loudness"][0], current_params["loudness"][1]))
-        matching_danceability = matching_loudness.where("danceability", are.between(current_params["danceability"][0], current_params["danceability"][1]))
-        matching_valence = matching_danceability.where("valence", are.between(current_params["valence"][0], current_params["valence"][1])).sort("valence", descending=False)
+        # pandas conversion
+        print(current_params["mode"])
+        no_comedy = spotify[spotify["genre"] != "Comedy"]
+        matching_mode = no_comedy[spotify["mode"] == current_params["mode"]]
+        matching_tempo = matching_mode[spotify.tempo.between(current_params["tempo"][0], current_params["tempo"][1])]
+        matching_loudness = matching_tempo[matching_tempo.loudness.between(current_params["loudness"][0], current_params["loudness"][1])]
+        matching_danceability = matching_loudness[matching_loudness.danceability.between(current_params["danceability"][0], current_params["danceability"][1])]
+        matching_valence = matching_danceability[matching_danceability.valence.between(current_params["valence"][0], current_params["valence"][1])]
         random_song = matching_valence.sample(1)
-        random_song.show()
-        while isExplicit(random_song.column("track_id").item(0), client_credentials_manager):
+        random_song
+        while isExplicit(random_song.track_id.iloc[0], client_credentials_manager):
             random_song = matching_valence.sample(1)
-        track_id = random_song.column("track_id").item(0)
-        track_duration = random_song.column("duration_ms").item(0)/1000
-        print("tempo", random_song.column("tempo"))
-        print("mode", random_song.column("mode"))
-        print("danceability", random_song.column("danceability"))
-        print("valence", random_song.column("valence"))
+        track_id = random_song.track_id.iloc[0]
+        track_duration = random_song.duration_ms.iloc[0]/1000
+        print("tempo", random_song["tempo"].iloc[0])
+        print("mode", random_song["mode"].iloc[0])
+        print("danceability", random_song["danceability"].iloc[0])
+        print("valence", random_song["valence"].iloc[0])
         # open web browser and play song
         print("PLAY SONG")
+        
         play_song(track_id, track_duration)
+
+        ## Pause for random amount of seconds
+        pause_range = np.arange(180, 420)
+        pause_time = np.random.choice(pause_range)
+        print("pausing for {} minutes".format(pause_time / 60))
+        time.sleep(pause_time)
+        
     except:
         print("Exception")
         pass
